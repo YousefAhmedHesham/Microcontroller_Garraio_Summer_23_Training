@@ -30,6 +30,7 @@
 int counter = 0 ;
 volatile uint32_t systickCounter = 0 ;
 volatile uint32_t printing = 0 ;
+volatile uint32_t flag = 0 ;
 
 void uart_print (void)
 {
@@ -127,116 +128,13 @@ void GPIOBinit()
     GPIO_PORTB_DIR_R |= (LED_RED_CAR_TRAFFIC2 | LED_YELLOW_CAR_TRAFFIC2 | LED_GREEN_CAR_TRAFFIC2  );
     GPIO_PORTB_DEN_R |= (LED_RED_CAR_TRAFFIC2 | LED_YELLOW_CAR_TRAFFIC2 | LED_GREEN_CAR_TRAFFIC2 );
 }
-
-void Traffic_Light_only (void)
-{
-    while (1)
-         {
-         if ((TIMER0_RIS_R & 0x01) == 1 && counter ==0 ) // If Timer A has timed out
-             {
-               TIMER0_ICR_R |= (1 << 0); // Clear Flag
-              GPIO_PORTE_DATA_R = LED_GREEN_CAR_TRAFFIC1 ;
-              GPIO_PORTC_DATA_R=PEDESTRIAN_RED1;
-              GPIO_PORTB_DATA_R =  LED_RED_CAR_TRAFFIC2;
-              GPIO_PORTD_DATA_R = PEDESTRIAN_GREEN2 ;
-
-          while (printing == 0)    // for printing only one time
-          {
-              UARTprintf("Traffic 1 is green & Traffic 2 is red "); UARTprintf("\n");
-              UARTprintf("PEDESTRIAN Traffic 1 is red & PEDESTRIAN Traffic 2 is green  "); UARTprintf("\n");
-              UARTprintf("------------------------------------------------ "); UARTprintf("\n");
-              printing ++ ;
-          }
-              systickCounter ++ ;
-
-              if (systickCounter >= 5)
-                  {
-                    systickCounter = 0; // Reset the counter
-                    GPIO_PORTE_DATA_R = LED_YELLOW_CAR_TRAFFIC1;  //PE2 YELLOW
-                    UARTprintf("Traffic 1 becomes yellow !! "); UARTprintf("\n");
-                    UARTprintf("------------------------------------------------ "); UARTprintf("\n");
-                    counter ++ ;
-                    printing = 0 ;
-                  }
-             }
-     else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==1 ) // If Timer A has timed out
-             {
-               TIMER0_ICR_R |= (1 << 0); // Clear Flag
-               systickCounter ++ ;
-               if (systickCounter >= 2)
-                  {
-                   systickCounter = 0; // Reset the counter
-                   GPIO_PORTE_DATA_R = LED_RED_CAR_TRAFFIC1; 
-                   GPIO_PORTC_DATA_R=PEDESTRIAN_GREEN1;
-                        counter ++ ;
-
-                    UARTprintf("Traffic 1 is red & Traffic 2 is red "); UARTprintf("\n");
-                    UARTprintf("PEDESTRIAN Traffic 1 is green & PEDESTRIAN Traffic 2 is green  "); UARTprintf("\n");
-                    UARTprintf("------------------------------------------------ "); UARTprintf("\n");
-                  }
-            }
-     else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==2 ) // If Timer A has timed out
-            {
-
-            TIMER0_ICR_R |= (1 << 0); // Clear Flag
-            counter ++ ;
-            }
-          /* -------------------------------------------------------------------------------*/
-     else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==3 ) // If Timer A has timed out
-             {
-             TIMER0_ICR_R |= (1 << 0); // Clear Flag
-             GPIO_PORTB_DATA_R = LED_GREEN_CAR_TRAFFIC2;
-             GPIO_PORTD_DATA_R = PEDESTRIAN_RED2 ;
-             systickCounter ++ ;
-             while (printing == 0)
-                   {
-                   UARTprintf("Traffic 1 is red & Traffic 2 is green "); UARTprintf("\n");
-                   UARTprintf("PEDESTRIAN Traffic 1 is green & PEDESTRIAN Traffic 2 is red  "); UARTprintf("\n");
-                   UARTprintf("------------------------------------------------ "); UARTprintf("\n");
-                   printing ++ ;
-                   }
-                   if (systickCounter >= 5)
-                      {
-                       systickCounter = 0; // Reset the counter
-                       GPIO_PORTB_DATA_R = LED_YELLOW_CAR_TRAFFIC2; //PB2  YELLOW
-                       UARTprintf("Traffic 2 becomes yellow !! "); UARTprintf("\n");
-                       UARTprintf("------------------------------------------------ "); UARTprintf("\n");
-                            counter ++ ;
-                            printing = 0 ;
-                      }
-             }
-     else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==4 ) // If Timer A has timed out
-          {
-          TIMER0_ICR_R |= (1 << 0); // Clear Flag
-          systickCounter ++ ;
-          if (systickCounter >= 2)
-           {
-            systickCounter = 0; // Reset the counter
-            GPIO_PORTB_DATA_R = LED_RED_CAR_TRAFFIC2;
-            GPIO_PORTD_DATA_R = PEDESTRIAN_GREEN2 ;
-        
-            UARTprintf("Traffic 1 is red & Traffic 2 is red "); UARTprintf("\n");
-            UARTprintf("PEDESTRIAN Traffic 1 is green & PEDESTRIAN Traffic 2 is green  "); UARTprintf("\n");
-            UARTprintf("------------------------------------------------ "); UARTprintf("\n");
-            counter ++ ;
-             }
-         }
- else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==5 ) // If Timer A has timed out
-        {
-         TIMER0_ICR_R |= (1 << 0); // Clear Flag
-         counter =0 ;
-        }
-     }
-}
-
-
 void Interrupt (void)
 {
-
-    delayMs(300) ;  // for Debouncing
-      if (GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_4) // Check if interrupt is caused by PF4/SW1
+      if (flag == 1) // Check if interrupt is caused by PF4/SW1
         {
-            GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4); // Clear the interrupt flag
+
+          flag = 0 ;
+
             if (counter == 0 )
             {
             GPIO_PORTC_DATA_R=PEDESTRIAN_GREEN1;
@@ -257,9 +155,10 @@ void Interrupt (void)
             }
          }
 
-       else if (GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_0) // Check if interrupt is caused by PF0/SW2
+       else if (flag == 2) // Check if interrupt is caused by PF0/SW2
         {
-           GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0); // Clear the interrupt flag
+
+           flag = 0 ;
            if (counter == 3)
            {
                      GPIO_PORTD_DATA_R=PEDESTRIAN_GREEN2;
@@ -281,10 +180,11 @@ void Interrupt (void)
            }
         }
 
-       else if ((GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_4) && (GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_0) )
+       else if ( flag == 3)
        {
-           GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4); // Clear the interrupt flag
-           GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0); // Clear the interrupt flag
+
+           flag = 0 ;
+
                      if (counter == 0 )
                      {
                      GPIO_PORTC_DATA_R=PEDESTRIAN_GREEN1;
@@ -311,17 +211,155 @@ void Interrupt (void)
                      {
                                      UARTprintf("Wait 2 seconds !!!  "); UARTprintf("\n");
                      }
+
+
                      else if ( counter == 0 || counter == 1 || counter == 5 )
                      {
                                        UARTprintf("You can already pass !!  "); UARTprintf("\n");
                      }
                                        delayMs(4000) ;
        }
+
 }
 
+void Traffic_Light_only (void)
+{
+    while (1)
+         {
+        Interrupt();
+         if ((TIMER0_RIS_R & 0x01) == 1 && counter ==0 ) // If Timer A has timed out
+             {
+               TIMER0_ICR_R |= (1 << 0); // Clear Flag
+              GPIO_PORTE_DATA_R = LED_GREEN_CAR_TRAFFIC1 ;
+              GPIO_PORTC_DATA_R=PEDESTRIAN_RED1;
+              GPIO_PORTB_DATA_R =  LED_RED_CAR_TRAFFIC2;
+              GPIO_PORTD_DATA_R = PEDESTRIAN_GREEN2 ;
+
+          while (printing == 0)    // for printing only one time
+          {
+              UARTprintf("Traffic 1 is green & Traffic 2 is red "); UARTprintf("\n");
+
+              UARTprintf("PEDESTRIAN Traffic 1 is red & PEDESTRIAN Traffic 2 is green  "); UARTprintf("\n");
+
+              UARTprintf("------------------------------------------------ "); UARTprintf("\n");
+              printing ++ ;
+          }
+              systickCounter ++ ;
+
+              if (systickCounter >= 5)
+                  {
+
+                    systickCounter = 0; // Reset the counter
+                    GPIO_PORTE_DATA_R = LED_YELLOW_CAR_TRAFFIC1;  //PE2 YELLOW
+                    UARTprintf("Traffic 1 becomes yellow !! "); UARTprintf("\n");
+
+                    UARTprintf("------------------------------------------------ "); UARTprintf("\n");
+
+                    counter ++ ;
+                    printing = 0 ;
+                  }
+             }
+           else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==1 ) // If Timer A has timed out
+             {
+               TIMER0_ICR_R |= (1 << 0); // Clear Flag
+               systickCounter ++ ;
+               if (systickCounter >= 2)
+                  {
+                   systickCounter = 0; // Reset the counter
+                   GPIO_PORTE_DATA_R = LED_RED_CAR_TRAFFIC1; //PE1  WHITE
+                   GPIO_PORTC_DATA_R=PEDESTRIAN_GREEN1;//on board LED on
+
+                        counter ++ ;
+
+                        UARTprintf("Traffic 1 is red & Traffic 2 is red "); UARTprintf("\n");
+
+                        UARTprintf("PEDESTRIAN Traffic 1 is green & PEDESTRIAN Traffic 2 is green  "); UARTprintf("\n");
+
+                        UARTprintf("------------------------------------------------ "); UARTprintf("\n");
+                  }
+            }
+
+           else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==2 ) // If Timer A has timed out
+            {
+
+            TIMER0_ICR_R |= (1 << 0); // Clear Flag
+            counter ++ ;
+            }
+          /* -------------------------------------------------------------------------------*/
+           else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==3 ) // If Timer A has timed out
+                 {
+          //     GPIO_PORTE_DATA_R = 0x00 ;
+                   TIMER0_ICR_R |= (1 << 0); // Clear Flag
+               GPIO_PORTB_DATA_R = LED_GREEN_CAR_TRAFFIC2;
+               GPIO_PORTD_DATA_R = PEDESTRIAN_RED2 ;
+                   systickCounter ++ ;
+                   while (printing == 0)
+                   {
+                   UARTprintf("Traffic 1 is red & Traffic 2 is green "); UARTprintf("\n");
+
+                   UARTprintf("PEDESTRIAN Traffic 1 is green & PEDESTRIAN Traffic 2 is red  "); UARTprintf("\n");
+                   UARTprintf("------------------------------------------------ "); UARTprintf("\n");
+                   printing ++ ;
+                   }
+                   if (systickCounter >= 5)
+                      {
+                       systickCounter = 0; // Reset the counter
+                       GPIO_PORTB_DATA_R = LED_YELLOW_CAR_TRAFFIC2; //PB2  YELLOW
+                       UARTprintf("Traffic 2 becomes yellow !! "); UARTprintf("\n");
+                       UARTprintf("------------------------------------------------ "); UARTprintf("\n");
+                            counter ++ ;
+                            printing = 0 ;
+                      }
+                 }
+           else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==4 ) // If Timer A has timed out
+                 {
+                  TIMER0_ICR_R |= (1 << 0); // Clear Flag
+                  systickCounter ++ ;
+                  if (systickCounter >= 2)
+                     {
+                      systickCounter = 0; // Reset the counter
+                      GPIO_PORTB_DATA_R = LED_RED_CAR_TRAFFIC2;
+                     GPIO_PORTD_DATA_R = PEDESTRIAN_GREEN2 ;
+                     UARTprintf("Traffic 1 is red & Traffic 2 is red "); UARTprintf("\n");
+
+                    UARTprintf("PEDESTRIAN Traffic 1 is green & PEDESTRIAN Traffic 2 is green  "); UARTprintf("\n");
+                    UARTprintf("------------------------------------------------ "); UARTprintf("\n");
+                      counter ++ ;
+                     }
+                 }
+           else if ((TIMER0_RIS_R & 0x01) == 1 && counter ==5 ) // If Timer A has timed out
+                 {
+                  TIMER0_ICR_R |= (1 << 0); // Clear Flag
+                 counter =0 ;
+                 }
+     }
+   }
 void GPIOPortF_Handler(void)
 {
-    Interrupt() ;
+
+    delayMs(300) ; // for Debouncing
+
+    if (GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_4) // Check if interrupt is caused by PF4/SW1
+    {
+        GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0); // Clear the interrupt flag
+        GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4); // Clear the interrupt flag
+
+
+        flag = 1 ;
+    }
+    else if((GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_0) )// Check if interrupt is caused by PF0/SW2
+            {
+        GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0); // Clear the interrupt flag
+         GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4); // Clear the interrupt flag
+        flag = 2 ;
+            }
+    else if ((GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_4) && (GPIOIntStatus(GPIO_PORTF_BASE, true) & GPIO_PIN_0))
+        {
+        GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0); // Clear the interrupt flag
+        GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4); // Clear the interrupt flag
+
+        flag = 3 ;
+        }
 }
 int main()
 {
